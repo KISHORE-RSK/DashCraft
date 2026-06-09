@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { ArrowLeft, Users, TrendingUp, Trophy, Target, GraduationCap } from 'lucide-react';
 
-const COLORS = ['#10B981', '#EF4444']; // Green for Passed, Red for Failed
+const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#F97316'];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -40,15 +40,36 @@ const SectionHeader = ({ badgeNumber, title, subtitle }) => (
 export default function Dashboard({ data, onBack }) {
   if (!data) return null;
 
-  const { kpis, clustered_column, histogram, stacked_column, horizontal_bar, radar, donut, smooth_line } = data;
+  const { meta = {}, kpis = [], clustered_column, histogram, stacked_column, horizontal_bar, radar, donut, smooth_line } = data;
 
-  const kpiCards = [
-    { title: 'Total Students', value: kpis.total_students, trend: kpis.total_students_trend, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100/50' },
-    { title: 'Average Score', value: kpis.average_score, trend: kpis.average_score_trend, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100/50' },
-    { title: 'Top Score', value: kpis.top_score, trend: kpis.top_score_trend, icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100/50' },
-    { title: 'Pass Rate', value: kpis.pass_rate, trend: kpis.pass_rate_trend, icon: Target, color: 'text-purple-600', bg: 'bg-purple-50 border-purple-100/50' },
-    { title: 'Active Students', value: kpis.active_students, trend: kpis.active_students_trend, icon: GraduationCap, color: 'text-cyan-600', bg: 'bg-cyan-50 border-cyan-100/50' },
-  ];
+  const icons = [Users, TrendingUp, Trophy, Target, GraduationCap];
+  const colorMap = {
+    blue: { text: 'text-blue-600', bg: 'bg-blue-50 border-blue-100/50' },
+    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100/50' },
+    amber: { text: 'text-amber-600', bg: 'bg-amber-50 border-amber-100/50' },
+    purple: { text: 'text-purple-600', bg: 'bg-purple-50 border-purple-100/50' },
+    cyan: { text: 'text-cyan-600', bg: 'bg-cyan-50 border-cyan-100/50' },
+    slate: { text: 'text-slate-600', bg: 'bg-slate-50 border-slate-100/50' },
+  };
+
+  const safeRadar = !radar || radar.length === 0 
+    ? [ { subject: 'N/A', Score: 0 }, { subject: 'N/A', Score: 0 }, { subject: 'N/A', Score: 0 } ]
+    : radar.length < 3 
+      ? [...radar, ...Array.from({ length: 3 - radar.length }).map(() => ({ subject: '---', Score: 0 }))]
+      : radar;
+
+  const dynamicKpiCards = kpis.slice(0, 5).map((kpi, idx) => {
+    const Icon = icons[idx % icons.length];
+    const colors = colorMap[kpi.color] || colorMap.slate;
+    return {
+      title: kpi.label || '-',
+      value: kpi.value || '-',
+      trend: kpi.trend || '',
+      icon: Icon,
+      color: colors.text,
+      bg: colors.bg,
+    };
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -69,9 +90,9 @@ export default function Dashboard({ data, onBack }) {
 
       {/* 1. Top KPI Summary Cards */}
       <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-        <SectionHeader badgeNumber="1" title="KPI Cards" subtitle="Core Student Performance Metrics" />
+        <SectionHeader badgeNumber="1" title="KPI Cards" subtitle="Key Performance Indicators" />
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
-          {kpiCards.map((kpi, idx) => (
+          {dynamicKpiCards.map((kpi, idx) => (
             <div key={idx} className={`border rounded-2xl p-5 shadow-xs transition-all duration-200 ${kpi.bg}`}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold text-slate-500 tracking-wide uppercase">{kpi.title}</p>
@@ -91,21 +112,22 @@ export default function Dashboard({ data, onBack }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* 2. Clustered Column Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="2" title="Clustered Column Chart" subtitle="Average Score by Subject" />
+          <SectionHeader badgeNumber="2" title="Clustered Column Chart" subtitle="Data Comparison" />
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={clustered_column} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#64748b" tickLine={false} axisLine={false} domain={[0, 100]} className="text-xs font-semibold" />
+                <YAxis stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Average Score" radius={[6, 6, 0, 0]} maxBarSize={50}>
-                  {clustered_column.map((entry, index) => {
-                    const colors = ['#3B82F6', '#10B981', '#8B5CF6']; // blue, green, purple
-                    return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                  })}
-                  <LabelList dataKey="Average Score" position="top" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
-                </Bar>
+                {meta.cluster_keys && meta.cluster_keys.map((key, index) => {
+                  const colors = ['#3B82F6', '#10B981', '#8B5CF6'];
+                  return (
+                    <Bar key={key} dataKey={key} fill={colors[index % colors.length]} radius={[6, 6, 0, 0]} maxBarSize={50}>
+                      <LabelList dataKey={key} position="top" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
+                    </Bar>
+                  );
+                })}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -113,7 +135,7 @@ export default function Dashboard({ data, onBack }) {
 
         {/* 3. Histogram */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="3" title="Histogram" subtitle="Score Distribution" />
+          <SectionHeader badgeNumber="3" title="Histogram" subtitle="Data Distribution" />
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={histogram} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
@@ -121,8 +143,8 @@ export default function Dashboard({ data, onBack }) {
                 <XAxis dataKey="range" stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <YAxis stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Students" fill="#60A5FA" radius={[6, 6, 0, 0]} maxBarSize={55}>
-                  <LabelList dataKey="Students" position="top" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
+                <Bar dataKey={meta.hist_key || "Count"} fill="#60A5FA" radius={[6, 6, 0, 0]} maxBarSize={55}>
+                  <LabelList dataKey={meta.hist_key || "Count"} position="top" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -131,7 +153,7 @@ export default function Dashboard({ data, onBack }) {
 
         {/* 4. Stacked Column Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="4" title="Stacked Column Chart" subtitle="Concept Mastery (Overall Average)" />
+          <SectionHeader badgeNumber="4" title="Stacked Column Chart" subtitle="Composition" />
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stacked_column} margin={{ top: 20, right: 100, left: -20, bottom: 0 }}>
@@ -140,12 +162,15 @@ export default function Dashboard({ data, onBack }) {
                 <YAxis stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ paddingLeft: '20px', fontSize: '12px', fontWeight: '600' }} />
-                <Bar dataKey="Coding" stackId="a" fill="#3B82F6"><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
-                <Bar dataKey="Quiz" stackId="a" fill="#10B981"><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
-                <Bar dataKey="Assignment" stackId="a" fill="#F59E0B"><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
-                <Bar dataKey="Frameworks" stackId="a" fill="#F97316"><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
-                <Bar dataKey="Practice" stackId="a" fill="#8B5CF6"><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
-                <Bar dataKey="Theory" stackId="a" fill="#06B6D4" radius={[4, 4, 0, 0]}><LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" /></Bar>
+                {meta.stacked_keys && meta.stacked_keys.map((key, index) => {
+                  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#F97316', '#8B5CF6', '#06B6D4'];
+                  const isLast = index === meta.stacked_keys.length - 1;
+                  return (
+                    <Bar key={key} dataKey={key} stackId="a" fill={colors[index % colors.length]} radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}>
+                      <LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" />
+                    </Bar>
+                  );
+                })}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -153,7 +178,7 @@ export default function Dashboard({ data, onBack }) {
 
         {/* 5. Horizontal Bar Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="5" title="Horizontal Bar Chart" subtitle="Top 10 Students" />
+          <SectionHeader badgeNumber="5" title="Horizontal Bar Chart" subtitle="Top 10 Metrics" />
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={horizontal_bar} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
@@ -161,8 +186,8 @@ export default function Dashboard({ data, onBack }) {
                 <XAxis type="number" stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <YAxis dataKey="name" type="category" stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" width={90} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Score" fill="#3B82F6" radius={[0, 6, 6, 0]} maxBarSize={18}>
-                  <LabelList dataKey="Score" position="right" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
+                <Bar dataKey={meta.horiz_key || "Value"} fill="#3B82F6" radius={[0, 6, 6, 0]} maxBarSize={18}>
+                  <LabelList dataKey={meta.horiz_key || "Value"} position="right" fill="#475569" fontSize={11} fontWeight="700" offset={8} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -171,10 +196,10 @@ export default function Dashboard({ data, onBack }) {
 
         {/* 6. Radar Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col">
-          <SectionHeader badgeNumber="6" title="Radar Chart" subtitle="Student Performance Profile" />
+          <SectionHeader badgeNumber="6" title="Radar Chart" subtitle="Multivariate Profile" />
           <div className="flex-1 h-[320px] flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radar}>
+              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={safeRadar}>
                 <PolarGrid stroke="#e2e8f0" />
                 <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8' }} />
@@ -187,23 +212,23 @@ export default function Dashboard({ data, onBack }) {
 
         {/* 7. Donut Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col relative">
-          <SectionHeader badgeNumber="7" title="Donut Chart" subtitle="Pass vs Fail" />
+          <SectionHeader badgeNumber="7" title="Donut Chart" subtitle="Distribution Details" />
           <div className="flex-1 h-[320px] flex items-center justify-center relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={donut}
+                  data={donut && donut.length > 0 ? donut : [{ name: 'N/A', value: 1 }]}
                   cx="50%"
                   cy="50%"
                   innerRadius={75}
                   outerRadius={105}
-                  paddingAngle={4}
+                  paddingAngle={donut && donut.length > 1 ? 4 : 0}
                   dataKey="value"
                   stroke="none"
                 >
-                  {donut.map((entry, index) => (
+                  {donut && donut.length > 0 ? donut.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                  )) : <Cell fill="#f1f5f9" />}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
                 <Legend iconType="circle" verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: '600' }} />
@@ -211,31 +236,41 @@ export default function Dashboard({ data, onBack }) {
             </ResponsiveContainer>
             {/* Donut Inside Stats Overlay */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-18px' }}>
-              <span className="text-3xl font-extrabold text-slate-800">86%</span>
-              <span className="text-xs font-semibold text-slate-500 mt-0.5">Pass Rate</span>
+              <span className="text-3xl font-extrabold text-slate-800">{donut[0]?.value || 0}</span>
+              <span className="text-xs font-semibold text-slate-500 mt-0.5" style={{ maxWidth: '80px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{donut[0]?.name || 'Data'}</span>
             </div>
           </div>
         </div>
 
         {/* 8. Line Chart */}
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm lg:col-span-2">
-          <SectionHeader badgeNumber="8" title="Line Chart" subtitle="Performance Trend (Average Score)" />
+          <SectionHeader badgeNumber="8" title="Line Chart" subtitle="Trend Analysis" />
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={smooth_line} margin={{ top: 25, right: 20, left: -20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                  </linearGradient>
+                  {meta.line_keys && meta.line_keys.map((key, index) => {
+                    const colors = ['#3B82F6', '#10B981', '#F59E0B'];
+                    return (
+                      <linearGradient key={`grad-${key}`} id={`colorGradient${index}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={colors[index % colors.length]} stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor={colors[index % colors.length]} stopOpacity={0}/>
+                      </linearGradient>
+                    );
+                  })}
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#64748b" tickLine={false} axisLine={false} domain={[50, 100]} className="text-xs font-semibold" />
+                <YAxis stroke="#64748b" tickLine={false} axisLine={false} className="text-xs font-semibold" />
                 <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="Score" stroke="#3B82F6" strokeWidth={3.5} fillOpacity={1} fill="url(#colorScore)" activeDot={{ r: 6 }}>
-                  <LabelList dataKey="Score" position="top" fill="#475569" fontSize={11} fontWeight="700" offset={10} />
-                </Area>
+                {meta.line_keys && meta.line_keys.map((key, index) => {
+                  const colors = ['#3B82F6', '#10B981', '#F59E0B'];
+                  return (
+                    <Area key={key} type="monotone" dataKey={key} stroke={colors[index % colors.length]} strokeWidth={3.5} fillOpacity={1} fill={`url(#colorGradient${index})`} activeDot={{ r: 6 }}>
+                      <LabelList dataKey={key} position="top" fill="#475569" fontSize={11} fontWeight="700" offset={10} />
+                    </Area>
+                  );
+                })}
               </AreaChart>
             </ResponsiveContainer>
           </div>
