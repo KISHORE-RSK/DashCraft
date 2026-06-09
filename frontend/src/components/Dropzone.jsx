@@ -68,8 +68,8 @@ export default function Dropzone({ onUploadSuccess }) {
       <div
         className={`relative flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-3xl transition-all duration-300 shadow-md ${
           dragActive
-            ? 'border-blue-500 bg-blue-50/50 scale-[1.01]'
-            : 'border-slate-300 bg-white hover:bg-slate-50/50 hover:border-slate-400'
+            ? 'border-olive-500 bg-olive-50/50 scale-[1.01]'
+            : 'border-coffee-300 bg-white hover:bg-coffee-50/50 hover:border-coffee-400'
         }`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -85,21 +85,21 @@ export default function Dropzone({ onUploadSuccess }) {
         />
         
         <div className="flex flex-col items-center justify-center space-y-5">
-          <div className={`p-5 rounded-2xl transition-colors duration-200 ${dragActive ? 'bg-blue-100/50' : 'bg-slate-100'}`}>
-            <UploadCloud className={`h-12 w-12 ${dragActive ? 'text-blue-600' : 'text-slate-500'}`} />
+          <div className={`p-5 rounded-2xl transition-colors duration-200 ${dragActive ? 'bg-olive-100/50' : 'bg-coffee-100'}`}>
+            <UploadCloud className={`h-12 w-12 ${dragActive ? 'text-olive-600' : 'text-coffee-500'}`} />
           </div>
           
           <div className="text-center">
-            <h3 className="text-xl font-bold text-slate-800 mb-1.5">
+            <h3 className="text-xl font-bold text-coffee-900 mb-1.5">
               {uploading ? 'Processing File...' : 'Upload your data'}
             </h3>
-            <p className="text-sm text-slate-500 mb-5">
+            <p className="text-sm text-coffee-600 mb-5">
               Drag and drop your CSV, Excel, or JSON files here
             </p>
             <button
               onClick={onButtonClick}
               disabled={uploading}
-              className="inline-flex items-center px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-xs disabled:opacity-50"
+              className="inline-flex items-center px-5 py-2.5 bg-olive-800 hover:bg-olive-900 text-white text-sm font-semibold rounded-xl transition-all duration-200 shadow-xs disabled:opacity-50"
             >
               <File className="h-4 w-4 mr-2" />
               Browse Files
