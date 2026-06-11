@@ -1,10 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import io
+import json
+
+import numpy as np
+import pandas as pd
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pandas as pd
-import numpy as np
-import json
-import io
 
 app = FastAPI()
 
@@ -86,7 +87,6 @@ def smart_analyze(df: pd.DataFrame) -> dict:
     # ── 2. Clustered Column ───────────────────────────────────────────────────
     clustered_column = []
     cluster_keys = num_cols[:2] if len(num_cols) >= 2 else num_cols[:1]
-    cluster_x_label = primary_cat or "Row"
 
     if primary_cat and cluster_keys:
         grp = df.groupby(primary_cat)[cluster_keys].mean().round(2).reset_index().head(8)
@@ -120,7 +120,6 @@ def smart_analyze(df: pd.DataFrame) -> dict:
     # ── 4. Stacked Column ────────────────────────────────────────────────────
     stacked_column = []
     stacked_keys = num_cols[:6]
-    stacked_x_label = primary_cat or "Row"
 
     if primary_cat and stacked_keys:
         grp = df.groupby(primary_cat)[stacked_keys].mean().round(2).reset_index().head(6)
@@ -147,7 +146,7 @@ def smart_analyze(df: pd.DataFrame) -> dict:
             horizontal_bar.append({"name": str(row[primary_cat])[:20], horiz_key: round(float(row[horiz_key]), 2)})
     elif horiz_key:
         top = df.nlargest(10, horiz_key)[[horiz_key]].reset_index()
-        for idx_val, row in top.iterrows():
+        for _, row in top.iterrows():
             horizontal_bar.append({"name": f"Row {int(row['index'])+1}", horiz_key: round(float(row[horiz_key]), 2)})
 
     # ── 6. Radar ─────────────────────────────────────────────────────────────
@@ -162,7 +161,6 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 
     # ── 7. Donut ─────────────────────────────────────────────────────────────
     donut = []
-    DONUT_COLORS = ["#10B981","#3B82F6","#F59E0B","#EF4444","#8B5CF6","#F97316"]
 
     if primary_cat:
         counts = df[primary_cat].value_counts().head(5)
@@ -252,4 +250,4 @@ async def upload_file(file: UploadFile = File(...)):
         raise
     except Exception as e:
         print(f"Error processing file: {e}")
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}") from e
