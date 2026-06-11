@@ -17,9 +17,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
+
 
 @app.post("/api/login")
 async def login(req: LoginRequest):
@@ -40,13 +42,15 @@ def smart_analyze(df: pd.DataFrame) -> dict:
         if df[c].dtype == 'object' or str(df[c].dtype) == 'category':
             cleaned = df[c].astype(str).str.replace(r'[$,% ]', '', regex=True)
             converted = pd.to_numeric(cleaned, errors='coerce')
-            non_empty = (cleaned != '') & (cleaned != 'nan') & (cleaned != 'NaN')
+            non_empty = (cleaned != '') & (
+                cleaned != 'nan') & (cleaned != 'NaN')
             if non_empty.sum() > 0 and converted.notna().sum() / non_empty.sum() > 0.5:
                 df[c] = converted
 
     # --- Detect column types ---
     num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
-    cat_cols = [c for c in df.columns if not pd.api.types.is_numeric_dtype(df[c])]
+    cat_cols = [
+        c for c in df.columns if not pd.api.types.is_numeric_dtype(df[c])]
 
     # If every col is numeric but one has few unique values, treat it as categorical
     if not cat_cols:
@@ -71,8 +75,8 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 
     for col in num_cols[:4]:
         mean_val = df[col].mean()
-        max_val  = df[col].max()
-        min_val  = df[col].min()
+        max_val = df[col].max()
+        min_val = df[col].min()
         kpi_list.append({
             "label": f"Avg {col}",
             "value": f"{mean_val:.1f}",
@@ -82,14 +86,16 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 
     # Pad to at least 2 KPIs
     while len(kpi_list) < 2:
-        kpi_list.append({"label": "–", "value": "–", "trend": "", "color": "slate"})
+        kpi_list.append({"label": "–", "value": "–",
+                        "trend": "", "color": "slate"})
 
     # ── 2. Clustered Column ───────────────────────────────────────────────────
     clustered_column = []
     cluster_keys = num_cols[:2] if len(num_cols) >= 2 else num_cols[:1]
 
     if primary_cat and cluster_keys:
-        grp = df.groupby(primary_cat)[cluster_keys].mean().round(2).reset_index().head(8)
+        grp = df.groupby(primary_cat)[cluster_keys].mean().round(
+            2).reset_index().head(8)
         for _, row in grp.iterrows():
             item = {"name": str(row[primary_cat])[:20]}
             for k in cluster_keys:
@@ -110,7 +116,8 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 
     if hist_key:
         col_data = df[hist_key].dropna()
-        counts, bin_edges = np.histogram(col_data, bins=min(8, col_data.nunique()))
+        counts, bin_edges = np.histogram(
+            col_data, bins=min(8, col_data.nunique()))
         for i in range(len(counts)):
             histogram.append({
                 "range": f"{bin_edges[i]:.1f}–{bin_edges[i+1]:.1f}",
@@ -122,7 +129,8 @@ def smart_analyze(df: pd.DataFrame) -> dict:
     stacked_keys = num_cols[:6]
 
     if primary_cat and stacked_keys:
-        grp = df.groupby(primary_cat)[stacked_keys].mean().round(2).reset_index().head(6)
+        grp = df.groupby(primary_cat)[stacked_keys].mean().round(
+            2).reset_index().head(6)
         for _, row in grp.iterrows():
             item = {"name": str(row[primary_cat])[:20]}
             for k in stacked_keys:
@@ -143,11 +151,13 @@ def smart_analyze(df: pd.DataFrame) -> dict:
     if primary_cat and horiz_key:
         top = df.nlargest(10, horiz_key)[[primary_cat, horiz_key]]
         for _, row in top.iterrows():
-            horizontal_bar.append({"name": str(row[primary_cat])[:20], horiz_key: round(float(row[horiz_key]), 2)})
+            horizontal_bar.append({"name": str(row[primary_cat])[
+                                  :20], horiz_key: round(float(row[horiz_key]), 2)})
     elif horiz_key:
         top = df.nlargest(10, horiz_key)[[horiz_key]].reset_index()
         for _, row in top.iterrows():
-            horizontal_bar.append({"name": f"Row {int(row['index'])+1}", horiz_key: round(float(row[horiz_key]), 2)})
+            horizontal_bar.append(
+                {"name": f"Row {int(row['index'])+1}", horiz_key: round(float(row[horiz_key]), 2)})
 
     # ── 6. Radar ─────────────────────────────────────────────────────────────
     radar = []
@@ -156,8 +166,10 @@ def smart_analyze(df: pd.DataFrame) -> dict:
     for col in radar_cols:
         col_max = df[col].max()
         col_mean = df[col].mean()
-        normalized = round((col_mean / col_max * 100) if col_max and col_max != 0 else 0, 1)
-        radar.append({"subject": col[:14], "Score": normalized, "fullMark": 100})
+        normalized = round((col_mean / col_max * 100)
+                           if col_max and col_max != 0 else 0, 1)
+        radar.append(
+            {"subject": col[:14], "Score": normalized, "fullMark": 100})
 
     # ── 7. Donut ─────────────────────────────────────────────────────────────
     donut = []
@@ -168,8 +180,8 @@ def smart_analyze(df: pd.DataFrame) -> dict:
             donut.append({"name": str(name)[:20], "value": int(count)})
     elif primary_num:
         median = df[primary_num].median()
-        above  = int((df[primary_num] >= median).sum())
-        below  = int((df[primary_num] < median).sum())
+        above = int((df[primary_num] >= median).sum())
+        below = int((df[primary_num] < median).sum())
         donut = [
             {"name": f"≥ {median:.1f}", "value": above},
             {"name": f"< {median:.1f}", "value": below},
@@ -182,7 +194,8 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 
     if line_x_label and line_keys:
         # Use categorical as x-axis
-        grp = df.groupby(line_x_label)[line_keys].mean().round(2).reset_index().head(12)
+        grp = df.groupby(line_x_label)[line_keys].mean().round(
+            2).reset_index().head(12)
         for _, row in grp.iterrows():
             item = {"name": str(row[line_x_label])[:15]}
             for k in line_keys:
@@ -227,7 +240,7 @@ def smart_analyze(df: pd.DataFrame) -> dict:
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     try:
-        content  = await file.read()
+        content = await file.read()
         filename = file.filename.lower()
 
         df = None
@@ -237,12 +250,14 @@ async def upload_file(file: UploadFile = File(...)):
             df = pd.read_excel(io.BytesIO(content))
         elif filename.endswith(".json"):
             data = json.loads(content)
-            df   = pd.DataFrame(data if isinstance(data, list) else [data])
+            df = pd.DataFrame(data if isinstance(data, list) else [data])
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file type. Use CSV, Excel, or JSON.")
+            raise HTTPException(
+                status_code=400, detail="Unsupported file type. Use CSV, Excel, or JSON.")
 
         if df is None or df.empty:
-            raise HTTPException(status_code=400, detail="File is empty or could not be parsed.")
+            raise HTTPException(
+                status_code=400, detail="File is empty or could not be parsed.")
 
         return smart_analyze(df)
 
@@ -250,4 +265,5 @@ async def upload_file(file: UploadFile = File(...)):
         raise
     except Exception as e:
         print(f"Error processing file: {e}")
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Processing error: {str(e)}") from e
