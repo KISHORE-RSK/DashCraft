@@ -28,7 +28,6 @@ async def login(req: LoginRequest):
         return {"token": "mock-jwt-token-12345"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
-
 def smart_analyze(df: pd.DataFrame) -> dict:
     """Dynamically analyze any uploaded DataFrame and produce 8-chart dashboard data."""
 
