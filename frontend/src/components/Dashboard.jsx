@@ -5,6 +5,9 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, LabelList
 } from 'recharts';
 import { ArrowLeft, Users, TrendingUp, Trophy, Target, GraduationCap } from 'lucide-react';
+import D3BarChart from './D3BarChart';
+import D3DonutChart from './D3DonutChart';
+import D3PieChart from './D3PieChart';
 
 const COLORS = ['#667846', '#a56c43', '#819363', '#b88562', '#4f5e34', '#caa386'];
 
@@ -40,7 +43,7 @@ const SectionHeader = ({ badgeNumber, title, subtitle }) => (
 export default function Dashboard({ data, onBack }) {
   if (!data) return null;
 
-  const { meta = {}, kpis = [], clustered_column, histogram, stacked_column, horizontal_bar, radar, donut, smooth_line } = data;
+  const { kpis = [], charts = [] } = data;
 
   const icons = [Users, TrendingUp, Trophy, Target, GraduationCap];
   const colorMap = {
@@ -52,11 +55,7 @@ export default function Dashboard({ data, onBack }) {
     slate: { text: 'text-coffee-500', bg: 'bg-coffee-50 border-coffee-100/50' },
   };
 
-  const safeRadar = !radar || radar.length === 0 
-    ? [ { subject: 'N/A', Score: 0 }, { subject: 'N/A', Score: 0 }, { subject: 'N/A', Score: 0 } ]
-    : radar.length < 3 
-      ? [...radar, ...Array.from({ length: 3 - radar.length }).map(() => ({ subject: '---', Score: 0 }))]
-      : radar;
+
 
   const dynamicKpiCards = kpis.slice(0, 5).map((kpi, idx) => {
     const Icon = icons[idx % icons.length];
@@ -110,173 +109,133 @@ export default function Dashboard({ data, onBack }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* 2. Clustered Column Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="2" title="Clustered Column Chart" subtitle="Data Comparison" />
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={clustered_column} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
-                <XAxis dataKey="name" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <Tooltip content={<CustomTooltip />} />
-                {meta.cluster_keys && meta.cluster_keys.map((key, index) => {
-                  const colors = ['#3B82F6', '#10B981', '#8B5CF6'];
-                  return (
-                    <Bar key={key} dataKey={key} fill={colors[index % colors.length]} radius={[6, 6, 0, 0]} maxBarSize={50}>
-                      <LabelList dataKey={key} position="top" fill="#734d2f" fontSize={11} fontWeight="700" offset={8} />
-                    </Bar>
-                  );
-                })}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        {charts.map((chart, index) => {
+          const badgeNumber = (index + 2).toString();
+          return (
+            <div key={chart.id || index} className={`bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm flex flex-col ${chart.type === 'area' ? 'lg:col-span-2' : ''}`}>
+              <SectionHeader badgeNumber={badgeNumber} title={chart.title || 'Chart'} subtitle={chart.subtitle || ''} />
+              <div className="flex-1 h-[320px] flex items-center justify-center relative">
+                {(() => {
+                  const { type, data: chartData, xAxisKey, dataKeys } = chart;
+                  const chartColors = ['#3B82F6', '#10B981', '#F59E0B', '#F97316', '#8B5CF6', '#06B6D4'];
 
-        {/* 3. Histogram */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="3" title="Histogram" subtitle="Data Distribution" />
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={histogram} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
-                <XAxis dataKey="range" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey={meta.hist_key || "Count"} fill="#60A5FA" radius={[6, 6, 0, 0]} maxBarSize={55}>
-                  <LabelList dataKey={meta.hist_key || "Count"} position="top" fill="#734d2f" fontSize={11} fontWeight="700" offset={8} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+                  if (!chartData || chartData.length === 0) {
+                    return <div className="text-coffee-500">No data available</div>;
+                  }
 
-        {/* 4. Stacked Column Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="4" title="Stacked Column Chart" subtitle="Composition" />
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stacked_column} margin={{ top: 20, right: 100, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
-                <XAxis dataKey="name" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ paddingLeft: '20px', fontSize: '12px', fontWeight: '600' }} />
-                {meta.stacked_keys && meta.stacked_keys.map((key, index) => {
-                  const colors = ['#3B82F6', '#10B981', '#F59E0B', '#F97316', '#8B5CF6', '#06B6D4'];
-                  const isLast = index === meta.stacked_keys.length - 1;
-                  return (
-                    <Bar key={key} dataKey={key} stackId="a" fill={colors[index % colors.length]} radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]}>
-                      <LabelList position="center" fill="#ffffff" fontSize={10} fontWeight="700" />
-                    </Bar>
-                  );
-                })}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* 5. Horizontal Bar Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm">
-          <SectionHeader badgeNumber="5" title="Horizontal Bar Chart" subtitle="Top 10 Metrics" />
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={horizontal_bar} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" horizontal={false} />
-                <XAxis type="number" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis dataKey="name" type="category" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" width={90} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey={meta.horiz_key || "Value"} fill="#3B82F6" radius={[0, 6, 6, 0]} maxBarSize={18}>
-                  <LabelList dataKey={meta.horiz_key || "Value"} position="right" fill="#734d2f" fontSize={11} fontWeight="700" offset={8} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* 6. Radar Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm flex flex-col">
-          <SectionHeader badgeNumber="6" title="Radar Chart" subtitle="Multivariate Profile" />
-          <div className="flex-1 h-[320px] flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="75%" data={safeRadar}>
-                <PolarGrid stroke="#e2e8f0" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#94a3b8' }} />
-                <Radar name="Performance" dataKey="Score" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.2} />
-                <Tooltip content={<CustomTooltip />} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* 7. Donut Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm flex flex-col relative">
-          <SectionHeader badgeNumber="7" title="Donut Chart" subtitle="Distribution Details" />
-          <div className="flex-1 h-[320px] flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={donut && donut.length > 0 ? donut : [{ name: 'N/A', value: 1 }]}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={75}
-                  outerRadius={105}
-                  paddingAngle={donut && donut.length > 1 ? 4 : 0}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {donut && donut.length > 0 ? donut.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  )) : <Cell fill="#f1f5f9" />}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: '600' }} />
-              </PieChart>
-            </ResponsiveContainer>
-            {/* Donut Inside Stats Overlay */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-18px' }}>
-              <span className="text-3xl font-extrabold text-coffee-900">{donut[0]?.value || 0}</span>
-              <span className="text-xs font-semibold text-coffee-600 mt-0.5" style={{ maxWidth: '80px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{donut[0]?.name || 'Data'}</span>
+                  switch (type) {
+                    case 'bar':
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 25, right: 10, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
+                            <XAxis dataKey={xAxisKey} stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend />
+                            {dataKeys && dataKeys.map((key, idx) => (
+                              <Bar key={key} dataKey={key} fill={chartColors[idx % chartColors.length]} radius={[4, 4, 0, 0]} maxBarSize={55} />
+                            ))}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      );
+                    case 'stacked_bar':
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={{ top: 20, right: 100, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
+                            <XAxis dataKey={xAxisKey} stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend iconType="circle" layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ paddingLeft: '20px', fontSize: '12px', fontWeight: '600' }} />
+                            {dataKeys && dataKeys.map((key, idx) => {
+                              const isLast = idx === dataKeys.length - 1;
+                              return (
+                                <Bar key={key} dataKey={key} stackId="a" fill={chartColors[idx % chartColors.length]} radius={isLast ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                              );
+                            })}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      );
+                    case 'horizontal_bar':
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" horizontal={false} />
+                            <XAxis type="number" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <YAxis dataKey={xAxisKey} type="category" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" width={90} />
+                            <Tooltip content={<CustomTooltip />} />
+                            {dataKeys && dataKeys.map((key, idx) => (
+                              <Bar key={key} dataKey={key} fill={chartColors[idx % chartColors.length]} radius={[0, 4, 4, 0]} maxBarSize={18} />
+                            ))}
+                          </BarChart>
+                        </ResponsiveContainer>
+                      );
+                    case 'area':
+                    case 'line':
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartData} margin={{ top: 25, right: 20, left: -20, bottom: 0 }}>
+                            <defs>
+                              {dataKeys && dataKeys.map((key, idx) => (
+                                <linearGradient key={`grad-${key}`} id={`colorGradient${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor={chartColors[idx % chartColors.length]} stopOpacity={0.15}/>
+                                  <stop offset="95%" stopColor={chartColors[idx % chartColors.length]} stopOpacity={0}/>
+                                </linearGradient>
+                              ))}
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
+                            <XAxis dataKey={xAxisKey} stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend />
+                            {dataKeys && dataKeys.map((key, idx) => (
+                              <Area key={key} type="monotone" dataKey={key} stroke={chartColors[idx % chartColors.length]} strokeWidth={3.5} fillOpacity={1} fill={`url(#colorGradient${idx})`} activeDot={{ r: 6 }} />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      );
+                    case 'radar':
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart cx="50%" cy="50%" outerRadius="75%" data={chartData}>
+                            <PolarGrid stroke="#e2e8f0" />
+                            <PolarAngleAxis dataKey={xAxisKey} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
+                            <PolarRadiusAxis angle={30} tick={{ fill: '#94a3b8' }} />
+                            <Tooltip content={<CustomTooltip />} />
+                            {dataKeys && dataKeys.map((key, idx) => (
+                              <Radar key={key} name={key} dataKey={key} stroke={chartColors[idx % chartColors.length]} fill={chartColors[idx % chartColors.length]} fillOpacity={0.2} />
+                            ))}
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      );
+                    case 'donut': {
+                      const dData = chartData.map(item => ({ name: item[xAxisKey], value: item[dataKeys && dataKeys[0]] }));
+                      return (
+                        <>
+                          <D3DonutChart data={dData} />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-18px' }}>
+                            <span className="text-3xl font-extrabold text-coffee-900">{dData[0]?.value || 0}</span>
+                            <span className="text-xs font-semibold text-coffee-600 mt-0.5" style={{ maxWidth: '80px', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dData[0]?.name || 'Data'}</span>
+                          </div>
+                        </>
+                      );
+                    }
+                    case 'pie': {
+                      const pData = chartData.map(item => ({ name: item[xAxisKey], value: item[dataKeys && dataKeys[0]] }));
+                      return <D3PieChart data={pData} />;
+                    }
+                    default:
+                      return <div className="text-coffee-500">Unsupported chart type: {type}</div>;
+                  }
+                })()}
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* 8. Line Chart */}
-        <div className="bg-white border border-coffee-100 rounded-3xl p-6 shadow-sm lg:col-span-2">
-          <SectionHeader badgeNumber="8" title="Line Chart" subtitle="Trend Analysis" />
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={smooth_line} margin={{ top: 25, right: 20, left: -20, bottom: 0 }}>
-                <defs>
-                  {meta.line_keys && meta.line_keys.map((key, index) => {
-                    const colors = ['#3B82F6', '#10B981', '#F59E0B'];
-                    return (
-                      <linearGradient key={`grad-${key}`} id={`colorGradient${index}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={colors[index % colors.length]} stopOpacity={0.15}/>
-                        <stop offset="95%" stopColor={colors[index % colors.length]} stopOpacity={0}/>
-                      </linearGradient>
-                    );
-                  })}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f6f0e3" vertical={false} />
-                <XAxis dataKey="name" stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <YAxis stroke="#a36d4a" tickLine={false} axisLine={false} className="text-xs font-semibold" />
-                <Tooltip content={<CustomTooltip />} />
-                {meta.line_keys && meta.line_keys.map((key, index) => {
-                  const colors = ['#3B82F6', '#10B981', '#F59E0B'];
-                  return (
-                    <Area key={key} type="monotone" dataKey={key} stroke={colors[index % colors.length]} strokeWidth={3.5} fillOpacity={1} fill={`url(#colorGradient${index})`} activeDot={{ r: 6 }}>
-                      <LabelList dataKey={key} position="top" fill="#734d2f" fontSize={11} fontWeight="700" offset={10} />
-                    </Area>
-                  );
-                })}
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
+          );
+        })}
       </div>
+
+
     </div>
   );
 }

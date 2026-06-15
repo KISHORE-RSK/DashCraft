@@ -6,6 +6,12 @@ import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import os
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -234,6 +240,114 @@ def smart_analyze(df: pd.DataFrame) -> dict:
         "smooth_line":      smooth_line,
     }
 
+def ai_smart_analyze(df: pd.DataFrame) -> dict:
+    """Use Gemini AI to dynamically determine the best charts and generate the dashboard schema."""
+    # --- Clean up ---
+    df = df.dropna(axis=1, how="all")
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # --- Aggressively convert to numeric ---
+    for c in df.columns:
+        if df[c].dtype == 'object' or str(df[c].dtype) == 'category':
+            cleaned = df[c].astype(str).str.replace(r'[$,% ]', '', regex=True)
+            converted = pd.to_numeric(cleaned, errors='coerce')
+            non_empty = (cleaned != '') & (cleaned != 'nan') & (cleaned != 'NaN')
+            if non_empty.sum() > 0 and converted.notna().sum() / non_empty.sum() > 0.5:
+                df[c] = converted
+
+    total_rows = len(df)
+    schema = []
+    for c in df.columns:
+        col_type = str(df[c].dtype)
+        unique_vals = df[c].nunique()
+        sample_vals = df[c].dropna().unique()[:5].tolist()
+        schema.append(f"- {c} ({col_type}): {unique_vals} unique values. Samples: {sample_vals}")
+
+    schema_str = "\n".join(schema)
+    
+    # We send a sample of the data to the LLM (up to 50 rows)
+    json_data = df.head(50).to_json(orient='records')
+    
+    prompt = f"""
+You are an expert data analyst. I have a dataset with {total_rows} rows. 
+Here is the schema:
+{schema_str}
+
+Here is a sample of the data (up to 50 rows):
+{json_data}
+
+Based on this data, create a dynamic dashboard configuration.
+Return a JSON object with the following structure:
+{{
+  "kpis": [
+    {{"label": "Metric Name", "value": "1,234", "trend": "up 5%", "color": "blue"}}
+  ],
+  "charts": [
+    {{
+      "id": "unique_string_id",
+      "type": "bar", // Choose from: "bar", "stacked_bar", "horizontal_bar", "area", "pie", "donut", "radar"
+      "title": "Chart Title",
+      "subtitle": "Chart Subtitle",
+      "xAxisKey": "name_of_the_key_for_xaxis_or_labels",
+      "dataKeys": ["list_of_keys_for_yaxis_values"],
+      "data": [
+         {{ "name_of_the_key_for_xaxis_or_labels": "Category A", "key1": 10, "key2": 20 }}
+      ]
+    }}
+  ]
+}}
+
+Instructions:
+1. Provide up to 6 charts that best represent this dataset.
+2. Ensure the "data" array contains actual aggregated or sampled data points derived from the sample provided, ready to be plotted.
+3. For pie/donut charts, "xAxisKey" acts as the name/label key, and "dataKeys" should have exactly one numeric value key.
+4. For radar charts, "xAxisKey" is the subject (angle axis), and "dataKeys" are the data series (radius).
+5. Only output valid JSON.
+"""
+    try:
+        client = genai.Client()
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
+        )
+        result = json.loads(response.text)
+        return result
+    except Exception as e:
+        print("AI analysis failed, falling back to heuristic:", e)
+        # Fallback to the old heuristic if AI fails
+        old_result = smart_analyze(df)
+        # Convert old format to the new format so frontend doesn't break
+        charts = []
+        if old_result["clustered_column"]:
+            charts.append({
+                "id": "clustered_column", "type": "bar", "title": "Clustered Column Chart", "subtitle": "Data Comparison",
+                "xAxisKey": "name", "dataKeys": old_result["meta"]["cluster_keys"], "data": old_result["clustered_column"]
+            })
+        if old_result["stacked_column"]:
+            charts.append({
+                "id": "stacked_column", "type": "stacked_bar", "title": "Stacked Column Chart", "subtitle": "Composition",
+                "xAxisKey": "name", "dataKeys": old_result["meta"]["stacked_keys"], "data": old_result["stacked_column"]
+            })
+        if old_result["donut"]:
+            charts.append({
+                "id": "donut", "type": "donut", "title": "Donut Chart", "subtitle": "Distribution Details",
+                "xAxisKey": "name", "dataKeys": ["value"], "data": old_result["donut"]
+            })
+        if old_result["smooth_line"]:
+            charts.append({
+                "id": "smooth_line", "type": "area", "title": "Line Chart", "subtitle": "Trend Analysis",
+                "xAxisKey": "name", "dataKeys": old_result["meta"]["line_keys"], "data": old_result["smooth_line"]
+            })
+            
+        return {
+            "kpis": old_result["kpis"],
+            "charts": charts
+        }
+
+
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -257,7 +371,7 @@ async def upload_file(file: UploadFile = File(...)):
             raise HTTPException(
                 status_code=400, detail="File is empty or could not be parsed.")
 
-        return smart_analyze(df)
+        return ai_smart_analyze(df)
 
     except HTTPException:
         raise
