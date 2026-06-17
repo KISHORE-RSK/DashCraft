@@ -240,6 +240,7 @@ def smart_analyze(df: pd.DataFrame) -> dict:
         "smooth_line":      smooth_line,
     }
 
+
 def ai_smart_analyze(df: pd.DataFrame) -> dict:
     """Use Gemini AI to dynamically determine the best charts and generate the dashboard schema."""
     # --- Clean up ---
