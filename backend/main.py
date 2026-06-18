@@ -255,7 +255,6 @@ def ai_smart_analyze(df: pd.DataFrame) -> dict:
             if non_empty.sum() > 0 and converted.notna().sum() / non_empty.sum() > 0.5:
                 df[c] = converted
 
-
     total_rows = len(df)
     schema = []
     for c in df.columns:
