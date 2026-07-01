@@ -23,9 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+
 
 
 @app.post("/api/login")
